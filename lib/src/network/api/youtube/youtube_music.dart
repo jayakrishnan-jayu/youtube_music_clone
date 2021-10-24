@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'youtube_helper.dart';
 import '../../utils/client/youtube_client.dart';
 import '../../utils/network_utils.dart';
+import '../../utils/enums.dart';
 
 class YoutubeMusic {
   static const baseUrl = 'https://music.youtube.com/';
@@ -54,13 +55,23 @@ class YoutubeMusic {
     return response.body;
   }
 
-  Future<void> search(String q) async {
+  Future<Map> search(String q, SearchType type) async {
     Map<String, String> query = {
       'query': q,
-      'params': 'Eg-KAQwIARAAGAAgACgAMABqChAEEAMQCRAFEAo%3D',
+      'params': YoutubeHelper.getParams(type),
     };
     Map response = jsonDecode(await _request(endpoint: 'search', query: query));
-    YoutubeHelper.parseMusic(response);
+
+    switch (type) {
+      case SearchType.song:
+        return YoutubeHelper.parseMusic(response);
+      case SearchType.album:
+        return YoutubeHelper.parseAlbum(response);
+      case SearchType.artist:
+        return YoutubeHelper.parseArtist(response);
+      case SearchType.playlist:
+        return YoutubeHelper.parsePlaylist(response);
+    }
   }
 
   void close() => _client.close();

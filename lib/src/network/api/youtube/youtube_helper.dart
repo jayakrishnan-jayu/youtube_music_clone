@@ -1,6 +1,5 @@
 import 'dart:convert';
-
-import '../../../models/music_model.dart';
+import '../../utils/enums.dart';
 
 class YoutubeHelper {
   static bool isValidYtcfg(Map input) {
@@ -78,53 +77,123 @@ class YoutubeHelper {
         }
       });
 
-  static List<MusicMetaModel> parseMusic(Map response) {
-    List<MusicMetaModel> songs = [];
-    try {
-      MusicMetaModel.continuation = response['contents']
-                      ['tabbedSearchResultsRenderer']['tabs'][0]['tabRenderer']
-                  ['content']['sectionListRenderer']['contents'][0]
-              ['musicShelfRenderer']['continuations'][0]['nextContinuationData']
-          ['continuation'];
+  static String _getContinuation(Map response, {String defaultKey = ''}) {
+    return response['contents']['tabbedSearchResultsRenderer']['tabs'][0]
+                    ['tabRenderer']['content']['sectionListRenderer']
+                ['contents'][0]['musicShelfRenderer']
+            .containsKey('continuations')
+        ? response['contents']['tabbedSearchResultsRenderer']['tabs'][0]
+                    ['tabRenderer']['content']['sectionListRenderer']
+                ['contents'][0]['musicShelfRenderer']['continuations'][0]
+            ['nextContinuationData']['continuation']
+        : defaultKey;
+  }
 
-      response['contents']['tabbedSearchResultsRenderer']['tabs'][0]
-                  ['tabRenderer']['content']['sectionListRenderer']['contents']
-              [0]['musicShelfRenderer']['contents']
-          .forEach((element) {
-        List<ThumbnailModel> photos = [];
-        element['musicResponsiveListItemRenderer']['thumbnail']
-                ['musicThumbnailRenderer']['thumbnail']['thumbnails']
-            .forEach((t) {
-          photos.add(ThumbnailModel(
-              url: t['url'], height: t['height'], width: t['width']));
-        });
+  static List<dynamic> _getContent(Map response) => response['contents']
+          ['tabbedSearchResultsRenderer']['tabs'][0]['tabRenderer']['content']
+      ['sectionListRenderer']['contents'][0]['musicShelfRenderer']['contents'];
 
-        songs.add(MusicMetaModel(
-            title: element['musicResponsiveListItemRenderer']['flexColumns'][0]
-                    ['musicResponsiveListItemFlexColumnRenderer']['text']
-                ['runs'][0]['text'],
-            videoId: element['musicResponsiveListItemRenderer']['menu']
-                    ['menuRenderer']['items'][0]['menuNavigationItemRenderer']
-                ['navigationEndpoint']['watchEndpoint']['videoId'],
-            playlistId: element['musicResponsiveListItemRenderer']['menu']
-                    ['menuRenderer']['items'][0]['menuNavigationItemRenderer']
-                ['navigationEndpoint']['watchEndpoint']['playlistId'],
-            duration: element['musicResponsiveListItemRenderer']['flexColumns'][1]['musicResponsiveListItemFlexColumnRenderer']['text']['runs'][4]['text'],
-            artist: ArtistModel(
-              name: element['musicResponsiveListItemRenderer']['flexColumns'][1]
-                      ['musicResponsiveListItemFlexColumnRenderer']['text']
-                  ['runs'][0]['text'],
-              browseId: element['musicResponsiveListItemRenderer']
-                              ['flexColumns'][1]
-                          ['musicResponsiveListItemFlexColumnRenderer']['text']
-                      ['runs'][0]['navigationEndpoint']['browseEndpoint']
-                  ['browseId'],
-            ),
-            thumbnail: photos));
-      });
-      return songs;
-    } catch (e) {
-      throw Exception(e);
+  static String _getName(Map element) =>
+      element['musicResponsiveListItemRenderer']['flexColumns'][0]
+              ['musicResponsiveListItemFlexColumnRenderer']['text']['runs'][0]
+          ['text'];
+
+  static List<dynamic> _getThumbnail(Map element) =>
+      element['musicResponsiveListItemRenderer']['thumbnail']
+          ['musicThumbnailRenderer']['thumbnail']['thumbnails'];
+
+  static String _getBrowseId(Map element) =>
+      element['musicResponsiveListItemRenderer']['navigationEndpoint']
+          ['browseEndpoint']['browseId'];
+
+  static List<dynamic> _getSection(Map element) =>
+      element['musicResponsiveListItemRenderer']['flexColumns'][1]
+          ['musicResponsiveListItemFlexColumnRenderer']['text']['runs'];
+
+  static Map _getPlaylistEndpoint(Map element) =>
+      element['musicResponsiveListItemRenderer']['menu']['menuRenderer']
+          ['items'][0]['menuNavigationItemRenderer']['navigationEndpoint'];
+
+  static String _getVideoId(Map element) =>
+      element['musicResponsiveListItemRenderer']['menu']['menuRenderer']
+              ['items'][0]['menuNavigationItemRenderer']['navigationEndpoint']
+          ['watchEndpoint']['videoId'];
+
+  static Map<String, dynamic> parseMusic(Map response) => {
+        'continuation': _getContinuation(response),
+        'content': _getContent(response).map((element) => {
+              'title': _getName(element),
+              'videoId': _getVideoId(element),
+              'playlistId': _getPlaylistEndpoint(element)['watchEndpoint']
+                  ['playlistId'],
+              'duration': _getSection(element).last['text'],
+              'artist': _getSection(element).runtimeType == [].runtimeType
+                  ? _getSection(element)
+                      .where((section) =>
+                          section.containsKey('navigationEndpoint'))
+                      .map((section) => {
+                            'name': section['text'],
+                            'browseId': section['navigationEndpoint']
+                                ['browseEndpoint']['browseId'],
+                          })
+                      .toList(growable: false)
+                  : [],
+              'thumbnail': _getThumbnail(element)
+            })
+      };
+  static Map<String, dynamic> parseAlbum(Map response) => {
+        'continuation': _getContinuation(response),
+        'content': _getContent(response).map((element) => {
+              'type': _getSection(element).first['text'],
+              'name': _getName(element),
+              'browseId': _getBrowseId(element),
+              'playlistId':
+                  _getPlaylistEndpoint(element)['watchPlaylistEndpoint']
+                      ['playlistId'],
+              'year': _getSection(element).first['last'],
+              'artist': _getSection(element)
+                  .where((section) => section.containsKey('navigationEndpoint'))
+                  .map((section) => {
+                        'name': section['text'],
+                        'browseId': section['navigationEndpoint']
+                            ['browseEndpoint']['browseId'],
+                      })
+                  .toList(growable: false),
+              'thumbnail': _getThumbnail(element)
+            })
+      };
+
+  static Map<String, dynamic> parseArtist(Map response) => {
+        'continuation': _getContinuation(response),
+        'content': _getContent(response).map((element) => {
+              'type': _getSection(element).first['text'],
+              'name': _getName(element),
+              'browseId': _getBrowseId(element),
+              'thumbnail': _getThumbnail(element)
+            })
+      };
+
+  static Map<String, dynamic> parsePlaylist(Map response) => {
+        'continuation': _getContinuation(response),
+        'content': _getContent(response).map((element) => {
+              'title': _getName(element),
+              'author': _getSection(element).first['text'],
+              'trackCount': _getSection(element).last['text'],
+              'browseId': _getBrowseId(element),
+              'thumbnails': _getThumbnail(element)
+            })
+      };
+
+  static String getParams(SearchType type) {
+    switch (type) {
+      case SearchType.song:
+        return 'EgWKAQIIAWoMEAMQBBAJEA4QChAF';
+      case SearchType.album:
+        return 'EgWKAQIYAWoMEAMQBBAJEA4QChAF';
+      case SearchType.artist:
+        return 'EgWKAQIgAWoMEAMQBBAJEA4QChAF';
+      case SearchType.playlist:
+        return 'EgeKAQQoAEABagwQDhAKEAMQBBAFEAk%3D';
     }
   }
 }
