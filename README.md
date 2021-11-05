@@ -1,4 +1,4 @@
-# alpha_musiq
+# youtube_music_clone
 
 A new Flutter project.
 

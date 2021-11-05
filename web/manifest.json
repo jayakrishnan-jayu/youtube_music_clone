@@ -1,6 +1,6 @@
 {
-    "name": "alpha_musiq",
-    "short_name": "alpha_musiq",
+    "name": "youtube_music_clone",
+    "short_name": "youtube_music_clone",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
