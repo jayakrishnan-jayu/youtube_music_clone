@@ -2,6 +2,29 @@ import 'dart:convert';
 import '../../utils/enums.dart';
 
 class YoutubeHelper {
+  static const List<int> _itagList = [
+    139,
+    140,
+    141,
+    171,
+    249,
+    250,
+    251
+  ]; // Audio Itag list
+
+  static String getParams(SearchType type) {
+    switch (type) {
+      case SearchType.song:
+        return 'EgWKAQIIAWoMEAMQBBAJEA4QChAF';
+      case SearchType.album:
+        return 'EgWKAQIYAWoMEAMQBBAJEA4QChAF';
+      case SearchType.artist:
+        return 'EgWKAQIgAWoMEAMQBBAJEA4QChAF';
+      case SearchType.playlist:
+        return 'EgeKAQQoAEABagwQDhAKEAMQBBAFEAk%3D';
+    }
+  }
+
   static bool isValidYtcfg(Map input) {
     for (String key in [
       'INNERTUBE_CLIENT_NAME',
@@ -184,16 +207,16 @@ class YoutubeHelper {
             })
       };
 
-  static String getParams(SearchType type) {
-    switch (type) {
-      case SearchType.song:
-        return 'EgWKAQIIAWoMEAMQBBAJEA4QChAF';
-      case SearchType.album:
-        return 'EgWKAQIYAWoMEAMQBBAJEA4QChAF';
-      case SearchType.artist:
-        return 'EgWKAQIgAWoMEAMQBBAJEA4QChAF';
-      case SearchType.playlist:
-        return 'EgeKAQQoAEABagwQDhAKEAMQBBAFEAk%3D';
+  static List<Map<String, dynamic>> parseAudioDetails(Map response) {
+    final List<Map<String, dynamic>> result = [];
+    if (response.containsKey('streamingData')) {
+      List res = response['streamingData']['adaptiveFormats'];
+      for (var element in res) {
+        if (_itagList.contains(element['itag'])) {
+          result.add(element);
+        }
+      }
     }
+    return result;
   }
 }

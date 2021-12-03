@@ -39,9 +39,28 @@ class YoutubeMusic {
     }
   }
 
+  Future<String> _requestMusicUrl(
+      {required String endpoint, required Map<String, String> query}) async {
+    query['key'] = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+    http.Response response = await _client.post(
+        Uri.parse(
+            '${baseUrl}youtubei/$_version/$endpoint?${NetworkUtils.encodeMap(query)}'),
+        body: jsonEncode({
+          'context': {
+            'client': {'clientName': 'ANDROID', 'clientVersion': '16.20'}
+          }
+        }));
+    if (response.statusCode != 200) {
+      throw Exception('Status Code: ${response.statusCode}');
+    }
+
+    return response.body;
+  }
+
   Future<String> _request(
       {required String endpoint, required Map<String, String> query}) async {
     query['key'] = _api;
+
     http.Response response = await _client.post(
       Uri.parse(
           '${baseUrl}youtubei/$_version/$endpoint?${NetworkUtils.encodeMap(query)}'),
@@ -72,6 +91,13 @@ class YoutubeMusic {
       case SearchType.playlist:
         return YoutubeHelper.parsePlaylist(response);
     }
+  }
+
+  Future<List<Map<String, dynamic>>> getMusicUrl(String videoId) async {
+    Map<String, String> query = {'videoId': videoId};
+    Map response =
+        jsonDecode(await _requestMusicUrl(endpoint: 'player', query: query));
+    return YoutubeHelper.parseAudioDetails(response);
   }
 
   void close() => _client.close();
