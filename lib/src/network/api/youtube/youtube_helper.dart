@@ -1,15 +1,18 @@
 import 'dart:convert';
+import '../../../models/music_model.dart';
 import '../../utils/enums.dart';
 
 class YoutubeHelper {
-  static const List<int> _itagList = [
-    139,
-    140,
-    141,
-    171,
-    249,
-    250,
-    251
+  YoutubeHelper._();
+
+  static const List<int> _audioItagList = [
+    139, // mp4
+    140, // mp4 AUDIO_QUALITY_MEDIUM
+    249, // webm AUDIO_QUALITY_LOW
+    250, // webm AUDIO_QUALITY_LOW
+    251, // webm AUDIO_QUALITY_MEDIUM
+    327, // mp4  AUDIO_QUALITY_MEDIUM
+    338, // webm AUDIO_QUALITY_MEDIUM
   ]; // Audio Itag list
 
   static String getParams(SearchType type) {
@@ -121,9 +124,14 @@ class YoutubeHelper {
               ['musicResponsiveListItemFlexColumnRenderer']['text']['runs'][0]
           ['text'];
 
-  static List<dynamic> _getThumbnail(Map element) =>
-      element['musicResponsiveListItemRenderer']['thumbnail']
-          ['musicThumbnailRenderer']['thumbnail']['thumbnails'];
+  static List<Thumbnail> _getThumbnails(Map element) {
+    List<dynamic> thumbnails = element['musicResponsiveListItemRenderer']
+        ['thumbnail']['musicThumbnailRenderer']['thumbnail']['thumbnails'];
+    return thumbnails
+        .map((e) =>
+            Thumbnail(width: e['width'], height: e['height'], url: e['url']))
+        .toList(growable: false);
+  }
 
   static String _getBrowseId(Map element) =>
       element['musicResponsiveListItemRenderer']['navigationEndpoint']
@@ -142,80 +150,105 @@ class YoutubeHelper {
               ['items'][0]['menuNavigationItemRenderer']['navigationEndpoint']
           ['watchEndpoint']['videoId'];
 
-  static Map<String, dynamic> parseMusic(Map response) => {
-        'continuation': _getContinuation(response),
-        'content': _getContent(response).map((element) => {
-              'title': _getName(element),
-              'videoId': _getVideoId(element),
-              'playlistId': _getPlaylistEndpoint(element)['watchEndpoint']
+  static MusicSearchResult parseMusic(Map response) => MusicSearchResult(
+      continuation: _getContinuation(response),
+      content: _getContent(response)
+          .map(
+            (element) => Music(
+              title: _getName(element),
+              videoId: _getVideoId(element),
+              playlistId: _getPlaylistEndpoint(element)['watchEndpoint']
                   ['playlistId'],
-              'duration': _getSection(element).last['text'],
-              'artist': _getSection(element).runtimeType == [].runtimeType
+              duration: _getSection(element).last['text'],
+              artists: _getSection(element).runtimeType == [].runtimeType
                   ? _getSection(element)
                       .where((section) =>
                           section.containsKey('navigationEndpoint'))
-                      .map((section) => {
-                            'name': section['text'],
-                            'browseId': section['navigationEndpoint']
-                                ['browseEndpoint']['browseId'],
-                          })
+                      .map(
+                        (section) => Artist(
+                          name: section['text'],
+                          browseId: section['navigationEndpoint']
+                              ['browseEndpoint']['browseId'],
+                        ),
+                      )
                       .toList(growable: false)
                   : [],
-              'thumbnail': _getThumbnail(element)
-            })
-      };
-  static Map<String, dynamic> parseAlbum(Map response) => {
-        'continuation': _getContinuation(response),
-        'content': _getContent(response).map((element) => {
-              'type': _getSection(element).first['text'],
-              'name': _getName(element),
-              'browseId': _getBrowseId(element),
-              'playlistId':
-                  _getPlaylistEndpoint(element)['watchPlaylistEndpoint']
-                      ['playlistId'],
-              'year': _getSection(element).first['last'],
-              'artist': _getSection(element)
+              thumbnails: _getThumbnails(element),
+            ),
+          )
+          .toList(growable: false));
+
+  static AlbumSearchResult parseAlbum(Map response) => AlbumSearchResult(
+      continuation: _getContinuation(response),
+      content: _getContent(response)
+          .map(
+            (element) => Album(
+              // 'type': _getSection(element).first['text'],
+              name: _getName(element),
+              browseId: _getBrowseId(element),
+              playlistId: _getPlaylistEndpoint(element)['watchPlaylistEndpoint']
+                  ['playlistId'],
+              year: _getSection(element).first['last'],
+              artists: _getSection(element)
                   .where((section) => section.containsKey('navigationEndpoint'))
-                  .map((section) => {
-                        'name': section['text'],
-                        'browseId': section['navigationEndpoint']
-                            ['browseEndpoint']['browseId'],
-                      })
+                  .map(
+                    (section) => Artist(
+                      name: section['text'],
+                      browseId: section['navigationEndpoint']['browseEndpoint']
+                          ['browseId'],
+                    ),
+                  )
                   .toList(growable: false),
-              'thumbnail': _getThumbnail(element)
-            })
-      };
+              thumbnails: _getThumbnails(element),
+            ),
+          )
+          .toList(growable: false));
 
-  static Map<String, dynamic> parseArtist(Map response) => {
-        'continuation': _getContinuation(response),
-        'content': _getContent(response).map((element) => {
-              'type': _getSection(element).first['text'],
-              'name': _getName(element),
-              'browseId': _getBrowseId(element),
-              'thumbnail': _getThumbnail(element)
-            })
-      };
+  static ArtistSearchResult parseArtist(Map response) => ArtistSearchResult(
+      continuation: _getContinuation(response),
+      content: _getContent(response)
+          .map(
+            (element) => Artist(
+              // 'type': _getSection(element).first['text'],
+              name: _getName(element),
+              browseId: _getBrowseId(element),
+              thumbnails: _getThumbnails(element),
+            ),
+          )
+          .toList(growable: false));
 
-  static Map<String, dynamic> parsePlaylist(Map response) => {
-        'continuation': _getContinuation(response),
-        'content': _getContent(response).map((element) => {
-              'title': _getName(element),
-              'author': _getSection(element).first['text'],
-              'trackCount': _getSection(element).last['text'],
-              'browseId': _getBrowseId(element),
-              'thumbnails': _getThumbnail(element)
-            })
-      };
+  static PlaylistSearchResult parsePlaylist(Map response) =>
+      PlaylistSearchResult(
+        continuation: _getContinuation(response),
+        content: _getContent(response)
+            .map(
+              (element) => Playlist(
+                title: _getName(element),
+                author: _getSection(element).first['text'],
+                trackCount: _getSection(element).last['text'],
+                browseId: _getBrowseId(element),
+                thumbnails: _getThumbnails(element),
+              ),
+            )
+            .toList(growable: false),
+      );
 
-  static List<Map<String, dynamic>> parseAudioDetails(Map response) {
-    final List<Map<String, dynamic>> result = [];
+  static List<AudioDetail> parseAudioDetails(Map response) {
+    List<AudioDetail> result = [];
     if (response.containsKey('streamingData')) {
       List res = response['streamingData']['adaptiveFormats'];
-      for (var element in res) {
-        if (_itagList.contains(element['itag'])) {
-          result.add(element);
-        }
-      }
+      result = res
+          .where((e) => _audioItagList.contains(e['itag']))
+          .map(
+            (e) => AudioDetail(
+              itag: e['itag'],
+              bitrate: e['bitrate'],
+              mimeType: e['mimeType'],
+              url: e['url'],
+            ),
+          )
+          .toList();
+      result.sort((a, b) => a.bitrate.compareTo(b.bitrate));
     }
     return result;
   }
